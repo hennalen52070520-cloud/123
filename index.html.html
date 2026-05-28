@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>臺灣遊蕩犬分析</title>
+    <!-- 引入地圖與圖表函式庫 -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root { --primary-red: #e74c3c; --bg-gray: #f4f4f4; }
+        body { font-family: "Microsoft JhengHei", sans-serif; background-color: var(--bg-gray); margin: 0; padding: 0; }
+        .container { max-width: 900px; margin: 0 auto; padding: 20px; }
+        header { text-align: center; background: #2c3e50; color: white; padding: 40px 20px; border-radius: 0 0 15px 15px; }
+        .author { font-size: 1em; opacity: 0.8; }
+        .section { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom: 30px; }
+        h2 { border-left: 5px solid var(--primary-red); padding-left: 15px; color: #333; }
+        /* 地圖樣式設定，模仿來源照片 [1] */
+        #map { height: 500px; width: 100%; border-radius: 8px; border: 1px solid #ccc; }
+        .analysis-text { background: #fff5f5; border: 1px solid #ffe3e3; padding: 15px; border-radius: 5px; margin-top: 15px; font-size: 0.95em; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>臺灣遊蕩犬分析</h1>
+    <p class="author">作者：連苙涵</p>
+</header>
+
+<div class="container">
+    <!-- 前言 -->
+    <div class="section">
+        <h2>前言</h2>
+        <p>本網頁旨在呈現 113 年全臺各縣市遊蕩犬分布現況，具備高度的社會監督與政策分析意義。遊蕩犬問題涉及公共安全、人畜共通疾病預防及動物福祉等多元面向。透過視覺化數據，我們能更客觀地觀察資源分配的急迫性。本網頁數據依據農業部「動物保護資訊網」之最新調查結果 [2]，結合內政部人口統計，為大眾提供具參考價值的資訊基礎，推廣理性討論與友善動物政策。</p>
+    </div>
+
+    <!-- 互動式氣泡地圖 (仿來源照片 [1]) -->
+    <div class="section">
+        <h2>互動式分布地圖 (估計數氣泡圖)</h2>
+        <div id="map"></div>
+        <div class="analysis-text">
+            <strong>關鍵數字分析：</strong>
+            全臺遊蕩犬總計 141,584 隻 [2]。地圖視覺化顯示，臺南市 (19,990) 與嘉義縣 (16,944) 的氣泡最為顯著，反映其遊蕩犬絕對數量居全臺前兩名 [3, 4]。中南部地區因地形廣大及管理難度，氣泡密度明顯高於北部都會區。
+        </div>
+    </div>
+
+    <!-- 互動式橫條圖 -->
+    <div class="section">
+        <h2>每百人遊蕩犬數排名</h2>
+        <canvas id="ratioChart"></canvas>
+        <div class="analysis-box">
+            <div class="analysis-text">
+                <strong>關鍵數字分析：</strong>
+                若依人口比例來看，臺東縣以每百人 4.04 隻位居密度榜首 [3, 4]，其次為嘉義縣 3.50 隻。反觀臺北市每百人僅 0.08 隻 [2]。這證明偏鄉與農業大縣面臨的「人犬共處」壓力遠高於城市，絕育與收容資源應更精準投放。
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 各縣市經緯度座標 (用於地圖定位)
+    const countyCoords = {
+        "新北市": [24.915, 121.673], "臺北市": [25.033, 121.565], "臺中市": [24.233, 120.941],
+        "臺南市": [23.141, 120.251], "高雄市": [22.990, 120.500], "桃園市": [24.868, 121.216],
+        "宜蘭縣": [24.602, 121.651], "新竹縣": [24.703, 121.125], "苗栗縣": [24.525, 120.941],
+        "彰化縣": [23.951, 120.481], "南投縣": [23.838, 120.987], "雲林縣": [23.709, 120.431],
+        "嘉義縣": [23.451, 120.559], "屏東縣": [22.549, 120.620], "臺東縣": [22.984, 121.071],
+        "花蓮縣": [23.756, 121.354], "澎湖縣": [23.571, 119.579], "基隆市": [25.128, 121.739],
+        "新竹市": [24.813, 120.967], "嘉義市": [23.480, 120.449], "金門縣": [24.449, 118.376],
+        "連江縣": [26.151, 119.928]
+    };
+
+    const data = [
+        {name: "臺南市", count: 19990, ratio: 1.07}, {name: "嘉義縣", count: 16944, ratio: 3.50},
+        {name: "高雄市", count: 10200, ratio: 0.37}, {name: "屏東縣", count: 10024, ratio: 1.26},
+        {name: "新北市", count: 9982, ratio: 0.25}, {name: "南投縣", count: 9644, ratio: 2.02},
+        {name: "彰化縣", count: 9313, ratio: 0.75}, {name: "臺東縣", count: 8551, ratio: 4.04},
+        {name: "臺中市", count: 8542, ratio: 0.30}, {name: "桃園市", count: 7893, ratio: 0.34},
+        {name: "苗栗縣", count: 7403, ratio: 1.38}, {name: "花蓮縣", count: 6983, ratio: 2.20},
+        {name: "雲林縣", count: 4934, ratio: 0.75}, {name: "基隆市", count: 3112, ratio: 0.86},
+        {name: "新竹縣", count: 2396, ratio: 0.41}, {name: "臺北市", count: 1908, ratio: 0.08},
+        {name: "宜蘭縣", count: 1630, ratio: 0.36}, {name: "嘉義市", count: 906, ratio: 0.34},
+        {name: "澎湖縣", count: 520, ratio: 0.48}, {name: "新竹市", count: 516, ratio: 0.11},
+        {name: "金門縣", count: 167, ratio: 0.12}, {name: "連江縣", count: 26, ratio: 0.19}
+    ];
+
+    // 初始化地圖 (仿照片效果 [1])
+    const map = L.map('map').setView([23.6, 120.9], 7);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OpenStreetMap &copy; CARTO'
+    }).addTo(map);
+
+    // 繪製紅色氣泡
+    data.forEach(d => {
+        const coords = countyCoords[d.name];
+        if (coords) {
+            L.circleMarker(coords, {
+                radius: Math.sqrt(d.count) / 4, // 根據開根號比例縮放半徑
+                color: 'white',
+                weight: 1,
+                fillColor: '#e74c3c',
+                fillOpacity: 0.6
+            }).addTo(map)
+              .bindPopup(`<b>${d.name}</b><br>遊蕩犬估計數：${d.count.toLocaleString()} 隻<br>每百人比例：${d.ratio}`);
+        }
+    });
+
+    // 每百人遊蕩犬數橫條圖
+    const sortedData = [...data].sort((a, b) => b.ratio - a.ratio);
+    new Chart(document.getElementById('ratioChart'), {
+        type: 'bar',
+        data: {
+            labels: sortedData.map(d => d.name),
+            datasets: [{
+                label: '每百人遊蕩犬數',
+                data: sortedData.map(d => d.ratio),
+                backgroundColor: sortedData.map(d => d.ratio > 2 ? '#c0392b' : '#e67e22')
+            }]
+        },
+        options: { indexAxis: 'y' }
+    });
+</script>
+
+</body>
+</html>
