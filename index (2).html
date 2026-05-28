@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>臺灣遊蕩犬分析 - 寶寶色系版</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        :root {
+            --baby-blue: #AEC6CF;
+            --baby-pink: #FFD1DC;
+            --mint-green: #B3E5BE;
+            --cream: #FFF9F4;
+            --text-gray: #5D5D5D;
+        }
+        body { font-family: "PingFang TC", "Microsoft JhengHei", sans-serif; background-color: var(--cream); color: var(--text-gray); margin: 0; padding: 0; overflow-x: hidden; }
+        header { text-align: center; background: linear-gradient(135deg, var(--baby-blue), var(--baby-pink)); color: white; padding: 60px 20px; border-radius: 0 0 50px 50px; position: relative; }
+        .author { font-weight: 300; opacity: 0.9; }
+        
+        /* 動態插圖樣式 */
+        .dog-illustration { width: 80px; position: absolute; bottom: -20px; right: 10%; filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.1)); }
+
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        .section { background: white; padding: 30px; border-radius: 30px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); margin-bottom: 40px; border: 2px solid #fff; }
+        h2 { color: var(--baby-blue); display: flex; align-items: center; gap: 10px; }
+        h2::before { content: '🐾'; font-size: 0.8em; }
+
+        #map { height: 450px; width: 100%; border-radius: 20px; border: 5px solid var(--baby-pink); }
+        .analysis-box { background: var(--cream); border-radius: 20px; padding: 20px; margin-top: 20px; border: 1px dashed var(--baby-pink); line-height: 1.6; }
+        
+        /* 圖表顏色優化 */
+        canvas { max-width: 100%; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>臺灣遊蕩犬分析</h1>
+    <p class="author">作者：連苙涵</p>
+    <!-- GSAP 動態小狗 SVG -->
+    <svg class="dog-illustration" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <path id="tail" d="M30 70 Q20 60 30 50" stroke="#FFD1DC" stroke-width="8" fill="none" stroke-linecap="round" />
+        <circle cx="50" cy="50" r="40" fill="#AEC6CF" />
+        <circle cx="35" cy="45" r="5" fill="white" />
+        <circle cx="65" cy="45" r="5" fill="white" />
+        <path d="M40 70 Q50 80 60 70" stroke="white" stroke-width="3" fill="none" stroke-linecap="round" />
+    </svg>
+</header>
+
+<div class="container">
+    <div class="section">
+        <h2>前言</h2>
+        <p>本網頁旨在以溫和直觀的方式，分析 113 年全臺遊蕩犬分布狀況。這份數據不僅是冰冷的數字，更象徵著我們對動物福利與社會共融的關注。透過視覺化呈現，我們希望能促進大眾對「生命教育」的重視，並支持農業部推動的精確管理政策。資料來源取自「動物保護資訊網」之 113 年各縣市遊蕩犬估計數調查結果 [1, 2]，結合人口統計，帶您一起走進動保數據的世界，為毛孩尋找更友善的未來 [3]。</p>
+    </div>
+
+    <div class="section">
+        <h2>數據地圖：哪裡的毛孩最多？</h2>
+        <div id="map"></div>
+        <div class="analysis-box">
+            <strong>🎀 關鍵數字分析：</strong>
+            全臺遊蕩犬總數估計為 141,584 隻 [1]。從地圖的粉色氣泡可以看出，**臺南市** (19,990 隻) 與 **嘉義縣** (16,944 隻) 的氣泡最大，是遊蕩犬數量最多的區域 [1, 4]。這提醒我們中南部地區的收容與絕育資源需要更多的溫暖投入。
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>每百人比例：密度小秘密</h2>
+        <canvas id="babyChart"></canvas>
+        <div class="analysis-box">
+            <strong>🎀 關鍵數字分析：</strong>
+            如果看「密度」，**臺東縣** 每一百人中就有 4.04 隻遊蕩犬，是全臺比例最高的地方 [4]！相比之下，臺北市每百人只有 0.08 隻 [2]。這代表偏鄉地區的人犬接觸機會更高，更需要推廣友善共處的知識。
+        </div>
+    </div>
+</div>
+
+<script>
+    // 來源數據整理
+    const strayData = [
+        {name: "臺南市", count: 19990, ratio: 1.07, lat: 23.141, lng: 120.251},
+        {name: "嘉義縣", count: 16944, ratio: 3.50, lat: 23.451, lng: 120.559},
+        {name: "高雄市", count: 10200, ratio: 0.37, lat: 22.990, lng: 120.500},
+        {name: "屏東縣", count: 10024, ratio: 1.26, lat: 22.549, lng: 120.620},
+        {name: "新北市", count: 9982, ratio: 0.25, lat: 24.915, lng: 121.673},
+        {name: "南投縣", count: 9644, ratio: 2.02, lat: 23.838, lng: 120.987},
+        {name: "彰化縣", count: 9313, ratio: 0.75, lat: 23.951, lng: 120.481},
+        {name: "臺東縣", count: 8551, ratio: 4.04, lat: 22.984, lng: 121.071},
+        {name: "花蓮縣", count: 6983, ratio: 2.20, lat: 23.756, lng: 121.354}
+    ];
+
+    // 初始化地圖 (淡色底圖)
+    const map = L.map('map').setView([23.6, 120.9], 7);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
+
+    strayData.forEach(d => {
+        L.circleMarker([d.lat, d.lng], {
+            radius: Math.sqrt(d.count) / 4,
+            fillColor: "#FFD1DC", // 寶寶粉
+            color: "#AEC6CF", // 寶寶藍
+            weight: 2,
+            fillOpacity: 0.7
+        }).addTo(map).bindPopup(`<b>${d.name}</b><br>估計：${d.count} 隻`);
+    });
+
+    // 寶寶色系橫條圖
+    const ctx = document.getElementById('babyChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: strayData.map(d => d.name),
+            datasets: [{
+                label: '每百人遊蕩犬數',
+                data: strayData.map(d => d.ratio),
+                backgroundColor: ['#AEC6CF', '#FFD1DC', '#B3E5BE', '#FFF9C4', '#E6E6FA', '#FFB347', '#FF6961', '#77DD77', '#CFCFCF'],
+                borderRadius: 20
+            }]
+        },
+        options: { indexAxis: 'y', plugins: { legend: { display: false } } }
+    });
+
+    // GSAP 動畫：搖尾巴
+    gsap.to("#tail", { rotation: 20, transformOrigin: "bottom right", duration: 0.5, repeat: -1, yoyo: true, ease: "sine.inOut" });
+    // 區塊淡入
+    gsap.from(".section", { opacity: 0, y: 50, duration: 1, stagger: 0.3, ease: "back.out(1.7)" });
+</script>
+
+</body>
+</html>
